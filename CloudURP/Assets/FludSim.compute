@@ -196,37 +196,61 @@ void InjectKernel(uint3 id : SV_DispatchThreadID)
 
         float finalDensity = injectValue * falloff * densityShape;
         finalDensity = max(0.0, finalDensity);
-        
-        float prev = densityWrite[id];
+
+        // Read previous value from densityRead (safe deterministic accumulation)
+        float prev = densityRead[id];
         densityWrite[id] = max(prev, finalDensity);
+    }
+    else
+    {
+        // If outside inject radius, just copy the previous density so unchanged cells persist.
+        densityWrite[id] = densityRead[id];
     }
 }
 
-// Adds a (pre-baked) source density texture into the current density (Stable Fluids add_source analog)
+// Adds a (pre-baked) source density texture into the current density
 [numthreads(8,8,8)]
 void AddSourceKernel(uint3 id : SV_DispatchThreadID)
 {
     float3 size = gridSize.xyz;
     if (!InBounds(id, size)) return;
 
-    float prev  = densityWrite[id];
+    float prev   = densityWrite[id];
     float addVal = sourceDensity[id] * sourceScale * deltaTime;
     
-    // Limit maximum density to prevent infinite accumulation
     const float maxDensity = 1.5;
-    float newDensity = prev + addVal;
-    densityWrite[id] = min(newDensity, maxDensity);
+
+    float emptySpace = saturate(maxDensity - prev);
+    
+    float newDensity = prev + (addVal * emptySpace);
+
+    densityWrite[id] = newDensity;
 }
 
-// Adds a velocity source texture (optional)
+// Adds turbulent noise to the velocity field
 [numthreads(8,8,8)]
 void AddVelocitySourceKernel(uint3 id : SV_DispatchThreadID)
 {
     float3 size = gridSize.xyz;
     if (!InBounds(id, size)) return;
 
+    // Use your existing noise functions to create wind turbulence
+    // The different scales/offsets create 3 independent noise fields
+    float3 noisePos = id * 0.1; // Scale of the noise
+    
+    // Add time to make the noise animate
+    noisePos.y += deltaTime * 0.5; 
+    
+    float noiseX = fbm(noisePos + float3(1.5, 9.2, 5.0), 2) * 2.0 - 1.0; // range [-1, 1]
+    float noiseY = fbm(noisePos + float3(7.8, 3.1, 0.7), 2) * 2.0 - 1.0;
+    float noiseZ = fbm(noisePos + float3(4.3, 6.6, 2.4), 2) * 2.0 - 1.0;
+    
+    float3 noiseVel = float3(noiseX, noiseY, noiseZ);
+    
+    // Add the noise, scaled by deltaTime and a strength factor
     float4 prev = velocityWrite[id];
-    float4 addv = sourceVelocity[id] * velocitySourceScale * deltaTime;
+    float4 addv = float4(noiseVel * velocitySourceScale * deltaTime, 0);
+    
     velocityWrite[id] = float4(prev.xyz + addv.xyz, 0);
 }
 
@@ -393,11 +417,6 @@ void SubtractGradientKernel(uint3 id : SV_DispatchThreadID)
                              pressureF - pressureB) * invTwoCell;
 
     float3 vel = velocityRead.Load(int4(pos, 0)).xyz - gradient;
-
-    // Enforce solid boundaries: zero normal component at edges
-    if (pos.x == 0 || pos.x == grid.x - 1) vel.x = 0.0;
-    if (pos.y == 0 || pos.y == grid.y - 1) vel.y = 0.0;
-    if (pos.z == 0 || pos.z == grid.z - 1) vel.z = 0.0;
 
     velocityWrite[id] = float4(vel, 0.0);
 }
