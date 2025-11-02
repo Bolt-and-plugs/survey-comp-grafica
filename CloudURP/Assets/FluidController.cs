@@ -97,6 +97,7 @@ public class FluidController : MonoBehaviour
   private int kDivergence = -1;
   private int kPressureJacobi = -1;
   private int kSubtractGradient = -1;
+  private int kClear = -1;
 
   // Cached bounds
   private Vector3 boundsMin;
@@ -326,6 +327,7 @@ public class FluidController : MonoBehaviour
     kDivergence   = SafeFind("DivergenceKernel");
     kPressureJacobi = SafeFind("PressureJacobiKernel");
     kSubtractGradient = SafeFind("SubtractGradientKernel");
+    kClear = SafeFind("ClearKernel");
   }
 
   int SafeFind(string kernel)
@@ -411,6 +413,12 @@ public class FluidController : MonoBehaviour
     densitySource.filterMode = FilterMode.Bilinear;
     densitySource.enableRandomWrite = true;
     densitySource.Create();
+
+    if (kClear >= 0)
+    {
+      computeShader.SetTexture(kClear, "densityWrite", densitySource);
+      DispatchFull(kClear);
+    }
 
     if (kInject >= 0)
     {

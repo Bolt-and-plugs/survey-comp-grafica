@@ -9,6 +9,7 @@
 #pragma kernel DivergenceKernel
 #pragma kernel PressureJacobiKernel
 #pragma kernel SubtractGradientKernel
+#pragma kernel clearKernel
 
 // Sampler for filtered sampling of 3D textures
 SamplerState sampler_linear_clamp;
@@ -183,6 +184,7 @@ void InjectKernel(uint3 id : SV_DispatchThreadID)
 
     float3 p = id;
     float d  = distance(p, injectPos);
+    
     if (d < injectRadius)
     {
         float falloff = 1 - (d / injectRadius);
@@ -197,17 +199,17 @@ void InjectKernel(uint3 id : SV_DispatchThreadID)
         float finalDensity = injectValue * falloff * densityShape;
         finalDensity = max(0.0, finalDensity);
 
-        // Read previous value from densityRead (safe deterministic accumulation)
-        float prev = densityRead[id];
+        float prev = densityWrite.Load(int4(id, 0)).x;
         densityWrite[id] = max(prev, finalDensity);
     }
-    else
+    /* // REMOVE THIS ELSE BLOCK
+    // It was zeroing out all spheres except the last one.
+    else 
     {
-        // If outside inject radius, just copy the previous density so unchanged cells persist.
         densityWrite[id] = densityRead[id];
     }
+    */
 }
-
 // Adds a (pre-baked) source density texture into the current density
 [numthreads(8,8,8)]
 void AddSourceKernel(uint3 id : SV_DispatchThreadID)
@@ -421,4 +423,11 @@ void SubtractGradientKernel(uint3 id : SV_DispatchThreadID)
     velocityWrite[id] = float4(vel, 0.0);
 }
 
-
+[numthreads(8,8,8)]
+void ClearKernel(uint3 id : SV_DispatchThreadID)
+{
+    float3 size = gridSize.xyz;
+    if (!InBounds(id, size)) return;
+    // Just write zero to the 'densityWrite' texture
+    densityWrite[id] = 0.0;
+}
