@@ -19,6 +19,9 @@ public class FluidController : MonoBehaviour
   public float diffusionRate = 0.05f;
   [Tooltip("Jacobi iterations for diffusion (more = smoother but slower).")]
   public int diffusionIterations = 15;
+  [Tooltip("Blend factor between pure advection and diffusion (0 = pure advection, 1 = pure diffusion).")]
+  [Range(0f, 1f)]
+  public float diffusionBlend = 0.5f;
 
   [Tooltip("Density decay rate over time (0 = no decay, 1 = fast decay).")]
   [Range(0f, 1f)]
@@ -34,14 +37,22 @@ public class FluidController : MonoBehaviour
 
   [Header("Velocity Init / Sources")]
   public Vector3 initialVelocity = new Vector3(0, 0.25f, 0);
+  [Header("Wind")]
+  [Tooltip("Direção e força globais do vento.")]
+  public Vector3 windDirection = new Vector3(1.0f, 0.0f, 0.0f);
+  [Tooltip("Multiplicador para a força do vento.")]
+  [Range(0f, 10f)]
+  public float windStrength = 1.0f;
+
+  [Tooltip("Amortecimento da velocidade (0.99 = leve, 0.9 = forte).")]
+  [Range(0.9f, 1.0f)]
+  public float velocityDamping = 0.99f;
 
 
   [Header("Generic Source (Prebaked)")]
   public bool addConstantSource = true;
   public float sourceScale = 1.0f;
 
-  [Tooltip("Only add source where density is low (prevents infinite accumulation)")]
-  public bool smartSourceInjection = true;
 
   [Tooltip("Time in seconds for source injection cycle (high = slower cycle)")]
   [Range(5f, 60f)]
@@ -70,16 +81,11 @@ public class FluidController : MonoBehaviour
   [Range(0f, 2f)]
   public float absorption = 0.5f;
 
-  [Space]
-  [Tooltip("Controls light scattering. 0 = uniform, 0.7 = strong forward scatter (silver lining)")]
-  [Range(-0.9f, 0.9f)]
-  public float gAnisotropy = 0.4f;
-
   public bool debugBounds = false;
 
   // Internal RenderTextures
   private RenderTexture densityA, densityB;
-  private RenderTexture velocity, velocityB; // <- added velocityB
+  private RenderTexture velocity, velocityB; 
   private RenderTexture pressureA, pressureB;
   private RenderTexture divergence;
 
@@ -118,10 +124,11 @@ public class FluidController : MonoBehaviour
       return;
     }
 
-    Allocate3DTexture(ref densityA, RenderTextureFormat.RFloat);
-    Allocate3DTexture(ref densityB, RenderTextureFormat.RFloat);
+    Allocate3DTexture(ref densityA, RenderTextureFormat.RFloat, TextureWrapMode.Repeat);
+    Allocate3DTexture(ref densityB, RenderTextureFormat.RFloat, TextureWrapMode.Repeat);
+    
     Allocate3DTexture(ref velocity, RenderTextureFormat.ARGBFloat);
-    Allocate3DTexture(ref velocityB, RenderTextureFormat.ARGBFloat); // <- allocate velocityB
+    Allocate3DTexture(ref velocityB, RenderTextureFormat.ARGBFloat); 
     Allocate3DTexture(ref pressureA, RenderTextureFormat.RFloat);
     Allocate3DTexture(ref pressureB, RenderTextureFormat.RFloat);
     Allocate3DTexture(ref divergence, RenderTextureFormat.RFloat);
@@ -136,7 +143,7 @@ public class FluidController : MonoBehaviour
       DispatchFull(kInitVelocity);
     }
 
-    // Build constant source (one-time sphere) if requested
+    // Build constant source if requested
     if (addConstantSource && kAddSource >= 0)
     {
       CreateSourceTexture();
@@ -150,7 +157,6 @@ public class FluidController : MonoBehaviour
     UpdateBoundsFromTransform();
     PushStaticRenderParams();
 
-    // Disable shadow casting for volumetric rendering
     if (volumeRenderer)
     {
       volumeRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -168,38 +174,13 @@ public class FluidController : MonoBehaviour
     computeShader.SetFloat("deltaTime", dt);
     float safeCellSize = Mathf.Max(1e-4f, cellSize);
     computeShader.SetFloat("cellSize", safeCellSize);
+    computeShader.SetVector("windDirection", windDirection.normalized);
+    computeShader.SetFloat("windStrength", windStrength);
+    computeShader.SetFloat("diffusionBlend", diffusionBlend);
+    computeShader.SetFloat("velocityDamping", velocityDamping);
 
     RebuildSourceTextureIfNeeded();
 
-
-    //  source (add_source stage)
-    if (kAddSource >= 0 && addConstantSource && densitySource)
-    {
-      float currentSourceScale = sourceScale;
-
-      // Smooth cycling: inject strongly at start, fade out, then reset
-      if (smartSourceInjection)
-      {
-        sourceTimer += dt;
-
-        // Calculate smooth fade using cosine curve
-        float cycleProgress = sourceTimer / sourceCycleTime;
-        if (cycleProgress >= 1.0f)
-        {
-          sourceTimer = 0f;
-          cycleProgress = 0f;
-        }
-
-        // Fade from 1.0 to 0.0 smoothly over the cycle
-        float fadeAmount = Mathf.Cos(cycleProgress * Mathf.PI) * 0.5f + 0.5f;
-        currentSourceScale *= fadeAmount;
-      }
-
-      computeShader.SetFloat("sourceScale", currentSourceScale);
-      computeShader.SetTexture(kAddSource, "densityWrite", densityA);
-      computeShader.SetTexture(kAddSource, "sourceDensity", densitySource);
-      DispatchFull(kAddSource);
-    }
 
     // Add velocity noise/source: write into velocityB then swap
     if (kAddVelocitySource >= 0)
@@ -210,12 +191,23 @@ public class FluidController : MonoBehaviour
       DispatchFull(kAddVelocitySource);
       Swap(ref velocity, ref velocityB);
     }
+
     if (projectVelocity)
     {
       ProjectVelocityField();
     }
+    
 
+    //  source (add_source stage)
+    if (kAddSource >= 0 && addConstantSource && densitySource)
+    {
+      float currentSourceScale = sourceScale;
 
+      computeShader.SetFloat("sourceScale", currentSourceScale);
+      computeShader.SetTexture(kAddSource, "densityWrite", densityA);
+      computeShader.SetTexture(kAddSource, "sourceDensity", densitySource);
+      DispatchFull(kAddSource);
+    }
 
 
     // 3. Diffusion (Jacobi) on density
@@ -247,6 +239,7 @@ public class FluidController : MonoBehaviour
       DispatchFull(kAdvect);
       Swap(ref densityA, ref densityB);
     }
+    
 
     // 5. Lifecycle: decay density over time
     if (kLifecycle >= 0 && decayRate > 0)
@@ -254,16 +247,6 @@ public class FluidController : MonoBehaviour
       computeShader.SetFloat("decayRate", decayRate);
       computeShader.SetTexture(kLifecycle, "densityWrite", densityA);
       DispatchFull(kLifecycle);
-    }
-
-    Light sun = RenderSettings.sun;
-    if (sun == null) sun = Object.FindAnyObjectByType<Light>(); // fallback
-    if (sun != null)
-    {
-      Vector3 sunDir = -sun.transform.forward;
-      rayMarchMaterial.SetVector("_LightDir", sunDir);
-      rayMarchMaterial.SetColor("_LightCol", sun.color * sun.intensity);
-      rayMarchMaterial.SetFloat("_gAnisotropy", gAnisotropy);
     }
 
     // 6. Update material
@@ -277,7 +260,6 @@ public class FluidController : MonoBehaviour
       rayMarchMaterial.SetColor("_DarkColor", darkCloudColor);
       rayMarchMaterial.SetFloat("_Absorption", absorption);
       rayMarchMaterial.SetFloat("_DensitySharpness", densitySharpness);
-      rayMarchMaterial.SetFloat("_G_Anisotropy", gAnisotropy);
       rayMarchMaterial.SetInt("_Steps", Mathf.Max(4, rayMarchSteps));
       rayMarchMaterial.SetInt("_DebugBounds", debugBounds ? 1 : 0);
     }
@@ -298,7 +280,7 @@ public class FluidController : MonoBehaviour
   // ------------------------------------------------------
   // Allocation / Setup
   // ------------------------------------------------------
-  void Allocate3DTexture(ref RenderTexture rt, RenderTextureFormat fmt)
+  void Allocate3DTexture(ref RenderTexture rt, RenderTextureFormat fmt, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
   {
     var desc = new RenderTextureDescriptor(
         gridSize.x,
@@ -315,7 +297,7 @@ public class FluidController : MonoBehaviour
     desc.depthBufferBits   = 0;
 
     rt = new RenderTexture(desc);
-    rt.wrapMode   = TextureWrapMode.Clamp;
+    rt.wrapMode   = wrapMode;
     rt.filterMode = FilterMode.Bilinear;
     rt.enableRandomWrite = true;
     rt.Create();
@@ -414,8 +396,8 @@ public class FluidController : MonoBehaviour
       mipCount = 1
     };
     densitySource = new RenderTexture(desc);
-    densitySource.wrapMode = TextureWrapMode.Clamp;
-    densitySource.filterMode = FilterMode.Point;
+    densitySource.wrapMode = TextureWrapMode.Repeat;
+    densitySource.filterMode = FilterMode.Bilinear;    
     densitySource.enableRandomWrite = true;
     densitySource.Create();
 
