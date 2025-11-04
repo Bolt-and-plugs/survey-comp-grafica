@@ -12,7 +12,7 @@ Este projeto tem, portanto, um foco educacional ao se utilizar uma ferramenta co
     \item \textbf{Integração com Unity URP:} Integrar o sistema de geração volumétrica de nuvens com o Unity Universal Render Pipeline, aproveitando suas capacidades de renderização e iluminação para melhorar a aparência das nuvens.
 \end{itemize}
 
-\section{Metodologia}
+\subsection{Metodologia}
 \label{sec:metodologia}
 
 A concretização dos objetivos educacionais deste projeto foi alcançada através da implementação de um sistema de simulação e renderização em tempo real, utilizando o motor Unity sob a arquitetura do \textit{Universal Render Pipeline} (URP). Esta plataforma foi selecionada por sua capacidade de integrar rotinas de computação aceleradas por GPU (GPGPU), um requisito fundamental para processar as simulações complexas em tempo real.
@@ -24,7 +24,7 @@ O \textit{pipeline} metodológico foi dividido em duas etapas principais, ambas 
 Subsequentemente, a segunda etapa consistiu na renderização deste volume dinâmico. Foi implementada a técnica de \textit{volumetric ray marching}, cuja fundamentação teórica foi apresentada na Seção 5. Um \textit{shader} customizado foi desenvolvido para marchar raios através do \textit{grid} de densidade, que é continuamente atualizado pelo \textit{Compute Shader}. Este \textit{shader} de renderização foi integrado ao URP para amostrar o volume e calcular a interação da luz (absorção e espalhamento), gerando a representação visual final das nuvens volumétricas.
 
 
-\section{Resultados}
+\subsection{Resultados}
 \label{sec:resultados}
 
 Resultados alcançados foram ok

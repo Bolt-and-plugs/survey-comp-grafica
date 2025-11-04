@@ -148,7 +148,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 400, y: 100, z: 900.9}
+  m_LocalScale: {x: 2000, y: 200, z: 2000}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -167,27 +167,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Effect
   computeShader: {fileID: 7200000, guid: d2552977336ad0b888d5ca8694d06b35, type: 3}
   gridSize: {x: 128, y: 64, z: 128}
-  diffusionRate: 0.05
+  diffusionRate: 0
   diffusionIterations: 15
+  diffusionBlend: 0.5
   decayRate: 0.5
   projectVelocity: 1
-  pressureIterations: 30
+  pressureIterations: 63
   cellSize: 1
   initialVelocity: {x: 0, y: 0.25, z: 0}
+  windDirection: {x: 1, y: 0, z: 0}
+  windStrength: 6.4
+  velocityDamping: 0.98
   addConstantSource: 1
   sourceScale: 1
-  smartSourceInjection: 1
-  sourceCycleTime: 20
-  cloudCount: 99
-  cloudRadius: 15
+  sourceCycleTime: 11.4
+  cloudCount: 54
+  cloudRadius: 7.6
   rayMarchMaterial: {fileID: 2100000, guid: b298d5f94c0bc1f438d66f252e84378f, type: 2}
   volumeRenderer: {fileID: 56427394}
-  densitySharpness: 1
+  densitySharpness: 2.5
   rayMarchSteps: 64
   cloudColor: {r: 1, g: 1, b: 0.98, a: 1}
   darkCloudColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
-  absorption: 0.5
-  gAnisotropy: 0.4
+  absorption: 0.04
   debugBounds: 1
 --- !u!23 &56427394
 MeshRenderer:
