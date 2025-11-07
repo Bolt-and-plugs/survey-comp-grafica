@@ -1,2 +1,15 @@
 \section{Conclusão}
-Concluido
+
+Este trabalho realizou um \emph{survey} abrangente sobre a relação simbiótica entre a física e a computação gráfica, demonstrando como a busca pelo realismo visual tem sido historicamente impulsionada pela integração de modelos físicos. A trajetória analisada, que se inicia com os desafios de simulação no MANIAC e passa pelos fundamentos da renderização fisicamente baseada (PBR), evidencia uma convergência clara: a computação gráfica moderna transcendeu a representação geométrica para se tornar um campo de simulação física computacional. Esta convergência, como explorado na Seção 5, é agora drasticamente acelerada pela introdução de paradigmas de \emph{Machine Learning}.
+
+A análise de domínios fundamentais reforçou esta tese. Demonstrou-se que técnicas procedurais, como o \emph{Fractional Brownian Motion (fBm)} para terrenos, embora eficazes, apenas atingem um patamar de realismo convincente quando submetidas a um pós-processamento baseado em simulação física, como a erosão hidráulica. Da mesma forma, a evolução dos sistemas de partículas para modelos hidrodinâmicos complexos, como SPH e métodos Eulerianos, ilustra a necessidade de solucionar equações que governam o mundo natural — processos que, embora precisos, são conhecidos por seu alto custo computacional.
+
+O estudo de caso prático, focado na \textbf{geração de nuvens volumétricas em tempo real no Unity URP}, serviu como a validação central dos conceitos estudados. Atingindo seu objetivo educacional, a implementação demonstrou a viabilidade de se executar simulações complexas em tempo real, aproveitando arquiteturas GPGPU contemporâneas. Este pipeline de duas etapas na GPU, analisado à luz das pesquisas recentes, destaca-se como um precursor direto das abordagens modernas de ML:
+
+\begin{itemize}
+    \item \textbf{Simulação (Compute Shader):} A solução numérica da equação de advecção-difusão para modelar a dinâmica do fluido. Esta é precisamente a classe de \emph{solvers} caros que as abordagens modernas de ML, como modelos substitutos (\emph{surrogate models}) e PINNs, buscam acelerar ou substituir \cite{Wang2024}.
+    
+    \item \textbf{Renderização (Shader Customizado):} A implementação da equação de renderização volumétrica através do \emph{volumetric ray marching}. Esta é a \emph{mesma técnica de renderização clássica} utilizada pelos \emph{Neural Radiance Fields} (NeRFs) para consultar redes neurais (MLPs) que representam a cena, contornando os custos proibitivos de memória de grades de voxels tradicionais \cite{Mildenhall2020}.
+\end{itemize}
+
+Este projeto, portanto, conclui que a física não é apenas uma ferramenta acessória, mas um pilar conceitual e estrutural na criação de mundos virtuais dinâmicos. O \emph{Machine Learning} surge não como um substituto para este pilar, mas como um poderoso catalisador: um conjunto de técnicas para acelerar, aprimorar a fidelidade e permitir novos níveis de controle artístico sobre estas simulações físicas \cite{Wang2024}, definindo a nova fronteira do realismo em tempo real.

@@ -1,0 +1,46 @@
+\section{O Impacto do Machine Learning no Desempenho de Simulações Físicas}
+
+Como observado na introdução deste trabalho, os avanços recentes em \emph{Machine Learning} (ML) estão redefinindo as fronteiras da computação gráfica. Em aplicações físicas, o impacto é particularmente transformador, abordando diretamente o principal gargalo dos \emph{solvers} numéricos tradicionais: o alto custo computacional. Mais do que apenas uma ferramenta, o ML introduz novos paradigmas que otimizam o desempenho em três eixos principais: aceleração de simulação, ganhos de fidelidade e memória, e aprimoramento de detalhes\cite{Wang2024}.
+
+\subsection{Aceleração de Simulação (Modelos Surrogados e PINNs)}
+
+A abordagem mais direta para ganhos de desempenho é o uso de redes neurais como \textbf{modelos substitutos} (ou \emph{surrogate models}). A ideia central é que, em vez de executar um \emph{solver} numérico iterativo e custoso a cada quadro --- como a simulação de erosão hidráulica (Seção 3.4) ou a solução das equações de Navier-Stokes (Seção 4.2) ---, uma rede neural é pré-treinada para aprender a função de aproximação desse \emph{solver}.
+
+Uma vez treinada, a rede pode realizar uma inferência (uma única passagem, ou \emph{forward pass}) para prever o resultado da simulação, muitas vezes de forma instantânea. O \emph{survey} de Wang et al. (2024) destaca que Redes Neurais Convolucionais (CNNs) e Redes Neurais Artificiais (ANNs) já são introduzidas para acelerar o passo de projeção de pressão em simulações de fluidos (Figura \ref{fig:ann_pressure}). Outras abordagens usam arquiteturas como LSTMs para prever a evolução temporal de um fluido em um "espaço latente" de baixa dimensão, acelerando drasticamente a simulação\cite{Wang2024}.
+
+
+Uma segunda abordagem, mencionada na Seção 1.2, são as \textbf{Redes Neurais Informadas pela Física (PINNs)}. Em vez de aprender a partir de dados de simulação, as PINNs aprendem a própria solução da equação diferencial parcial (PDE). A função de perda da rede é o resíduo da própria equação física (ex: a equação de advecção-difusão). A rede neural torna-se, efetivamente, o próprio \emph{solver}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{img/ANN.png}
+    \caption{Exemplo de uma Rede Neural Artificial (ANN) usada para acelerar o cálculo de projeção de pressão em uma simulação de fluido. A rede aprende a mapear vetores de características (velocidade, condições de contorno) diretamente para o campo de pressão. Imagem de Wang et al.\cite{Wang2024}.}
+    \label{fig:ann_pressure}
+\end{figure}
+
+\subsection{Fidelidade Visual e Eficiência de Memória (Renderização Neural)}
+
+Além de acelerar a \emph{simulação}, o ML revolucionou a \emph{renderização}. O exemplo proeminente é o \textbf{Neural Radiance Fields (NeRF)}, como introduzido por Mildenhall et al. (2020)\cite{Mildenhall2020}.
+
+O NeRF substitui representações de cena tradicionais (como malhas de polígonos ou grades de voxels) por uma rede neural (um MLP). Esta rede representa a cena como uma função 5D contínua, que mapeia uma coordenada espacial 3D ($x, y, z$) e uma direção de visualização 2D ($\theta, \phi$) para uma cor ($RGB$) e uma densidade de volume ($\sigma$).
+
+Para gerar uma imagem, o NeRF utiliza a mesma técnica de \textbf{renderização volumétrica clássica} (\emph{ray marching}) que é fundamental para a renderização de nuvens, como a explorada em nosso estudo de caso (Seção 4.3). Ao consultar a rede neural em múltiplos pontos ao longo de cada raio da câmera e acumular os resultados, o NeRF produz renderizações fotorrealistas de novos pontos de vista.
+
+O ganho de desempenho aqui é duplo:
+\begin{itemize}
+    \item \textbf{Qualidade:} O NeRF alcança resultados de ponta, superando métodos anteriores na síntese de novas visualizações fotorrealistas.
+    \item \textbf{Memória:} A abordagem contorna os "custos proibitivos de armazenamento" das grades de voxels discretizadas. Uma cena complexa pode ser armazenada nos pesos da rede, exigindo apenas uma fração do custo de armazenamento (ex: 5MB para os pesos da rede contra 15GB para representações de \emph{voxels} em um dos exemplos).
+\end{itemize}
+
+\subsection{Aprimoramento de Detalhes e Controle Artístico}
+
+Finalmente, o ML permite uma abordagem híbrida, onde simulações físicas de baixa resolução (rápidas de calcular) são aprimoradas por redes neurais para gerar detalhes de alta resolução. Esta é uma área de pesquisa ativa.
+
+O \emph{survey} de Wang et al. (2024) classifica isso como \textbf{métodos \emph{data-driven} para aprimoramento de detalhes}. A técnica mais comum é o \emph{upsampling} ou \textbf{super-resolução}. Redes neurais, como as GANs (Generative Adversarial Networks), podem ser treinadas para pegar um campo de velocidade ou densidade de baixa resolução e sintetizar detalhes turbulentos de alta frequência que são temporalmente coerentes \cite{Wang2024}.
+
+Além disso, o ML oferece novos níveis de \textbf{controle artístico}, que são difíceis de alcançar com \emph{solvers} puramente físicos. Isso inclui:
+\begin{itemize}
+    \item \textbf{Transferência de Estilo (Style Transfer):} Otimização de uma simulação para que ela corresponda a características visuais de uma imagem ou vídeo.
+    \item \textbf{Estimativa de Parâmetros:} Uso de redes neurais para extrair parâmetros físicos (como viscosidade) a partir de vídeos do mundo real.
+    \item \textbf{Geração por Exemplo:} Uso de GANs para gerar terrenos que seguem o estilo de dados de elevação do mundo real, indo além dos padrões genéricos do \emph{fBm} (Seção 3.2).
+\end{itemize}
